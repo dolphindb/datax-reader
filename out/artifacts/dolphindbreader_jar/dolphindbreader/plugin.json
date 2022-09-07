@@ -1,0 +1,6 @@
+{
+    "name": "dolphindbreader",
+    "class": "com.alibaba.datax.plugin.reader.dolphindbreader.DolphinDbreader",
+    "description": "dolphindb 导入 mysql",
+    "developer": "stx"
+}

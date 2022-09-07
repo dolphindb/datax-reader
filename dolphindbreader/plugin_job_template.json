@@ -1,0 +1,80 @@
+{
+    "job": {
+        "setting": {
+            "speed": {
+                 "channel": 1
+            },
+            "errorLimit": {
+                "record": 0,
+                "percentage": 0.02
+            }
+        },
+        "content": [
+            {
+                "reader": {
+                    "name": "dolphindbreader",
+                    "parameter": {
+                        "userId": "admin",
+                        "pwd": "123456",
+                        "host": "192.168.1.14",
+                        "port": 8900,
+						"dbPath": "dfs://testddb",
+						"tableName": "ps",
+						"table": [
+							{
+								"name": "bool"
+							},
+							{
+								"name": "short"
+							},
+							{
+								"name": "long"
+							},
+							{
+								"name": "date"
+							},
+							{
+								"name": "datetime"
+							},
+							{
+								"name": "timestamp"
+							},
+							{
+								"name": "nanotime"
+							},
+							{
+								"name": "nanotimestamp"
+							},
+							{
+								"name": "float"
+							},
+							{
+								"name": "double"
+							},
+							{
+								"name": "symbol"
+							},
+							{
+								"name": "string"
+							},
+							{
+								"name": "uuid"
+							},
+							{
+								"name": "id"
+							}
+						]
+						
+                    }
+                },
+               "writer": {
+                    "name": "streamwriter",
+                    "parameter": {
+                        "encoding": "UTF-8",
+                        "print": true
+                    }
+                }
+            }
+        ]
+    }
+}
