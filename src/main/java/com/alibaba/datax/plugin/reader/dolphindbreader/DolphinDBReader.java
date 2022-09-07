@@ -231,7 +231,7 @@ public class DolphinDBReader extends Reader {
             if (where.equals(""))
                 this.functionSql = String.format("select " + sb.toString() + " from loadTable('%s', '%s')", dbName, tbName);
             else
-                this.functionSql = String.format("select " + sb.toString() + " from loadTable('%s', '%s') where" + where, dbName, tbName);
+                this.functionSql = String.format("select " + sb.toString() + " from loadTable('%s', '%s') where " + where, dbName, tbName);
             dbConnection = new DBConnection();
             try {
                 dbConnection.connect(host, port, userid, pwd);
