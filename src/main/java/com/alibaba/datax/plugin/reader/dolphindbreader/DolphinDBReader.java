@@ -13,6 +13,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.time.*;
 import java.util.*;
 
 public class DolphinDBReader extends Reader {
@@ -61,6 +62,8 @@ public class DolphinDBReader extends Reader {
         private DBConnection dbConnection = null;
         private String functionSql = "";
         private List<String> cols = null;
+        private String dbName = "";
+        private String tbName = "";
 
         @Override
         public void startRead(RecordSender recordSender) {
@@ -97,11 +100,14 @@ public class DolphinDBReader extends Reader {
                                 break;
                             case DT_DATE:
                                 BasicDateVector dateVec = (BasicDateVector) bt.getColumn(one);
-                                column = new DateColumn((long) dateVec.getInt(i));
+                                LocalDate ld = dateVec.getDate(i);
+                                Instant instantld = ld.atTime(LocalTime.MIDNIGHT).atZone(ZoneId.systemDefault()).toInstant();
+                                column = new DateColumn(Date.from(instantld));
                                 break;
                             case DT_DATETIME:
                                 BasicDateTimeVector dateTimeVec = (BasicDateTimeVector) bt.getColumn(one);
-                                column = new DateColumn((long) dateTimeVec.getInt(i));
+                                LocalDateTime dt = dateTimeVec.getDateTime(i);
+                                column = new DateColumn(Date.from(dt.atZone( ZoneId.systemDefault()).toInstant()));
                                 break;
                             case DT_TIME:
                                 BasicTimeVector timeVec = (BasicTimeVector) bt.getColumn(one);
@@ -109,7 +115,8 @@ public class DolphinDBReader extends Reader {
                                 break;
                             case DT_TIMESTAMP:
                                 BasicTimestampVector timeStampVec = (BasicTimestampVector)  bt.getColumn(one);
-                                column = new DateColumn(timeStampVec.getLong(i));
+                                LocalDateTime ts = timeStampVec.getTimestamp(i);
+                                column = new DateColumn(Date.from(ts.atZone( ZoneId.systemDefault()).toInstant()));
                                 break;
                             case DT_NANOTIME:
                                 BasicNanoTimeVector nanoTimeVec = (BasicNanoTimeVector) bt.getColumn(one);
@@ -117,7 +124,8 @@ public class DolphinDBReader extends Reader {
                                 break;
                             case DT_NANOTIMESTAMP:
                                 BasicNanoTimestampVector nanoTimestampVec = (BasicNanoTimestampVector)  bt.getColumn(one);
-                                column = new StringColumn(nanoTimestampVec.getString(i));
+                                LocalDateTime nts = nanoTimestampVec.getNanoTimestamp(i);
+                                column = new DateColumn(Date.from(nts.atZone( ZoneId.systemDefault()).toInstant()));
                                 break;
                             case DT_BYTE:
                                 BasicByteVector byteVec = (BasicByteVector) bt.getColumn(one);
@@ -153,7 +161,8 @@ public class DolphinDBReader extends Reader {
                                 break;
                             case DT_DATEHOUR:
                                 BasicDateHourVector dateHourVec = (BasicDateHourVector) bt.getColumn(one);
-                                column = new DateColumn((long) dateHourVec.getInt(i));
+                                LocalDateTime dh = dateHourVec.getDateHour(i);
+                                column = new DateColumn(Date.from(dh.atZone( ZoneId.systemDefault()).toInstant()));
                                 break;
                             case DT_DURATION:
                                 BasicDurationVector durationVec = (BasicDurationVector) bt.getColumn(one);
@@ -173,7 +182,7 @@ public class DolphinDBReader extends Reader {
                                 break;
                             case DT_MONTH:
                                 BasicMonthVector monthVec = (BasicMonthVector) bt.getColumn(one);
-                                column = new DateColumn((long) monthVec.getInt(i));
+                                column = new StringColumn(monthVec.getString());
                                 break;
                             case DT_POINT:
                                 BasicPointVector pointVec = (BasicPointVector) bt.getColumn(one);
@@ -199,10 +208,24 @@ public class DolphinDBReader extends Reader {
 
         private void initCols(JSONArray fieldArr){
             this.cols = new ArrayList<>();
-            for (int i = 0; i < fieldArr.size(); i++){
-                JSONObject field = fieldArr.getJSONObject(i);
-                String colName = field.getString("name");
-                this.cols.add(colName);
+            if (fieldArr.toString().equals("[]")){
+                try {
+                    BasicDictionary schema = (BasicDictionary) dbConnection.run("loadTable(\"" + dbName + "\"" + ",`" + tbName + ").schema()");
+                    BasicTable colDefs = (BasicTable)schema.get(new BasicString("colDefs"));
+                    BasicStringVector colNames = (BasicStringVector) colDefs.getColumn("name");
+                    for (int i = 0; i < colDefs.rows(); i++){
+                        String colName = colNames.getString(i);
+                        this.cols.add(colName);
+                    }
+                }catch (Exception e){
+                    LOG.error(e.getMessage(),e);
+                }
+            }else {
+                for (int i = 0; i < fieldArr.size(); i++){
+                    JSONObject field = fieldArr.getJSONObject(i);
+                    String colName = field.getString("name");
+                    this.cols.add(colName);
+                }
             }
         }
 
@@ -214,10 +237,18 @@ public class DolphinDBReader extends Reader {
             String userid = this.readerConfig.getString(Key.USER_ID);
             String pwd = this.readerConfig.getString(Key.PWD);
 
+            dbConnection = new DBConnection();
+            try {
+                dbConnection.connect(host, port, userid, pwd);
+            } catch (IOException e) {
+                LOG.error(e.getMessage(), e);
+            }
+
             String dbName = this.readerConfig.getString(Key.DB_PATH);
             String tbName = this.readerConfig.getString(Key.TABLE_NAME);
+            this.dbName = dbName;
+            this.tbName = tbName;
             String where = this.readerConfig.getString(Key.WHERE);
-            this.functionSql = String.format("select * from loadTable('%s', '%s')", dbName, tbName);
             List<Object> tableField = this.readerConfig.getList(Key.TABLE);
             JSONArray fieldArr = JSONArray.parseArray(JSON.toJSONString(tableField));
             initCols(fieldArr);
@@ -229,15 +260,15 @@ public class DolphinDBReader extends Reader {
                     sb.append(cols.get(i));
             }
             if (where.equals(""))
-                this.functionSql = String.format("select " + sb.toString() + " from loadTable('%s', '%s')", dbName, tbName);
+                if (fieldArr.toString().equals("[]"))
+                    this.functionSql = String.format("select * from loadTable('%s', '%s')", dbName, tbName);
+                else
+                    this.functionSql = String.format("select " + sb.toString() + " from loadTable('%s', '%s')", dbName, tbName);
             else
-                this.functionSql = String.format("select " + sb.toString() + " from loadTable('%s', '%s') where " + where, dbName, tbName);
-            dbConnection = new DBConnection();
-            try {
-                dbConnection.connect(host, port, userid, pwd);
-            } catch (IOException e) {
-                LOG.error(e.getMessage(), e);
-            }
+                if (fieldArr.toString().equals("[]"))
+                    this.functionSql = String.format("select * from loadTable('%s', '%s') where " + where, dbName, tbName);
+                else
+                    this.functionSql = String.format("select " + sb.toString() + " from loadTable('%s', '%s') where " + where, dbName, tbName);
         }
 
 
