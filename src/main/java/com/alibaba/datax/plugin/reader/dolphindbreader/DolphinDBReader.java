@@ -77,7 +77,6 @@ public class DolphinDBReader extends Reader {
         }
 
 
-
         public void sendData(BasicTable bt, RecordSender recordSender){
             try {
                 for (int i = 0; i < bt.rows(); i++){
@@ -147,6 +146,7 @@ public class DolphinDBReader extends Reader {
                                 BasicUuidVector uuidVector = (BasicUuidVector) bt.getColumn(one);
                                 column = new StringColumn(uuidVector.get(i).getString());
                                 break;
+                            case DT_BLOB:
                             case DT_STRING:
                                 BasicStringVector stringVec = (BasicStringVector) bt.getColumn(one);
                                 column = new StringColumn(stringVec.getString(i));
