@@ -182,7 +182,7 @@ public class DolphinDBReader extends Reader {
                                 break;
                             case DT_MONTH:
                                 BasicMonthVector monthVec = (BasicMonthVector) bt.getColumn(one);
-                                column = new StringColumn(monthVec.getString());
+                                column = new StringColumn(monthVec.getString(i));
                                 break;
                             case DT_POINT:
                                 BasicPointVector pointVec = (BasicPointVector) bt.getColumn(one);
