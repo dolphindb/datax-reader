@@ -201,7 +201,7 @@ public class DolphinDBReader extends Reader {
                     recordSender.sendToWriter(record);
                 }
             }catch (Exception ex){
-                LOG.info(ex.getMessage());
+                LOG.error(ex.getMessage(), ex);
             }
             LOG.info("Value Send Success!!!!!!!");
         }
