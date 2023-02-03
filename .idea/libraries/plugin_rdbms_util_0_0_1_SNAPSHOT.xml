@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="plugin-rdbms-util-0.0.1-SNAPSHOT">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/libs/plugin-rdbms-util-0.0.1-SNAPSHOT.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

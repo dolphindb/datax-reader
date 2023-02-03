@@ -9,5 +9,8 @@
         <module name="dolphindbreader" />
       </profile>
     </annotationProcessing>
+    <bytecodeTargetLevel>
+      <module name="dolphindbreader" target="1.8" />
+    </bytecodeTargetLevel>
   </component>
 </project>
