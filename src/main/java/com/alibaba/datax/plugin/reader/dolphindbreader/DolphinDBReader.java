@@ -87,110 +87,124 @@ public class DolphinDBReader extends Reader {
                         switch (dataType) {
                             case DT_FLOAT:
                                 BasicFloatVector floatVec = (BasicFloatVector)  bt.getColumn(one);
-                                column = new DoubleColumn(floatVec.getFloat(i));
+                                column = floatVec.isNull(i) ? new DoubleColumn((Float)null) : new DoubleColumn(floatVec.getFloat(i));
                                 break;
                             case DT_DOUBLE:
                                 BasicDoubleVector doubleVec = (BasicDoubleVector) bt.getColumn(one);
-                                column = new DoubleColumn(doubleVec.getDouble(i));
+                                column = doubleVec.isNull(i) ? new DoubleColumn((Double)null) : new DoubleColumn(doubleVec.getDouble(i));
                                 break;
                             case DT_BOOL:
                                 BasicBooleanVector booleanVec = (BasicBooleanVector) bt.getColumn(one);
-                                column = new BoolColumn(booleanVec.getBoolean(i));
+                                column = booleanVec.isNull(i) ? new BoolColumn((Boolean) null) : new BoolColumn(booleanVec.getBoolean(i));
                                 break;
                             case DT_DATE:
                                 BasicDateVector dateVec = (BasicDateVector) bt.getColumn(one);
-                                LocalDate ld = dateVec.getDate(i);
-                                Instant instantld = ld.atTime(LocalTime.MIDNIGHT).atZone(ZoneId.systemDefault()).toInstant();
-                                column = new DateColumn(Date.from(instantld));
+                                if( dateVec.isNull(i)  ){
+                                    column = new DateColumn((Date) null);
+                                }else{
+                                    column = new DateColumn(Date.from(dateVec.getDate(i).atTime(LocalTime.MIDNIGHT).atZone(ZoneId.systemDefault()).toInstant()));
+                                }
                                 break;
                             case DT_DATETIME:
                                 BasicDateTimeVector dateTimeVec = (BasicDateTimeVector) bt.getColumn(one);
-                                LocalDateTime dt = dateTimeVec.getDateTime(i);
-                                column = new DateColumn(Date.from(dt.atZone( ZoneId.systemDefault()).toInstant()));
+                                if( dateTimeVec.isNull(i) ){
+                                    column = new DateColumn((Date) null);
+                                }else{
+                                    column = new DateColumn(Date.from(dateTimeVec.getDateTime(i).atZone( ZoneId.systemDefault()).toInstant()));
+                                }
                                 break;
                             case DT_TIME:
                                 BasicTimeVector timeVec = (BasicTimeVector) bt.getColumn(one);
-                                column = new StringColumn(timeVec.getString(i));
+                                column = timeVec.isNull(i) ? new StringColumn((String) null) : new StringColumn(timeVec.getString(i));
                                 break;
                             case DT_TIMESTAMP:
                                 BasicTimestampVector timeStampVec = (BasicTimestampVector)  bt.getColumn(one);
-                                LocalDateTime ts = timeStampVec.getTimestamp(i);
-                                column = new DateColumn(Date.from(ts.atZone( ZoneId.systemDefault()).toInstant()));
+                                if( timeStampVec.isNull(i) ){
+                                    column = new DateColumn((Date) null);
+                                }else{
+                                    column = new DateColumn(Date.from(timeStampVec.getTimestamp(i).atZone( ZoneId.systemDefault()).toInstant()));
+                                }
                                 break;
                             case DT_NANOTIME:
                                 BasicNanoTimeVector nanoTimeVec = (BasicNanoTimeVector) bt.getColumn(one);
-                                column = new StringColumn(nanoTimeVec.getString(i));
+                                column = nanoTimeVec.isNull(i) ? new StringColumn((String) null) : new StringColumn(nanoTimeVec.getString(i));
                                 break;
                             case DT_NANOTIMESTAMP:
                                 BasicNanoTimestampVector nanoTimestampVec = (BasicNanoTimestampVector)  bt.getColumn(one);
-                                LocalDateTime nts = nanoTimestampVec.getNanoTimestamp(i);
-                                column = new DateColumn(Date.from(nts.atZone( ZoneId.systemDefault()).toInstant()));
+                                if( nanoTimestampVec.isNull(i) ){
+                                    column = new DateColumn((Date) null);
+                                }else{
+                                    column = new DateColumn(Date.from(nanoTimestampVec.getNanoTimestamp(i).atZone( ZoneId.systemDefault()).toInstant()));
+                                }
                                 break;
                             case DT_BYTE:
                                 BasicByteVector byteVec = (BasicByteVector) bt.getColumn(one);
-                                column = new LongColumn((long)byteVec.getByte(i));
+                                column = byteVec.isNull(i) ? new LongColumn((Long) null) : new LongColumn((long)byteVec.getByte(i));
                                 break;
                             case DT_LONG:
                                 BasicLongVector longVec = (BasicLongVector)  bt.getColumn(one);
-                                column = new LongColumn(longVec.getLong(i));
+                                column = longVec.isNull(i) ? new LongColumn((Long) null) : new LongColumn(longVec.getLong(i));
                                 break;
                             case DT_SHORT:
                                 BasicShortVector shortVec = (BasicShortVector)  bt.getColumn(one);
-                                column = new LongColumn((long)shortVec.getShort(i));
+                                column = shortVec.isNull(i) ? new LongColumn((Long) null) : new LongColumn((long)shortVec.getShort(i));
                                 break;
                             case DT_INT:
                                 BasicIntVector intVec = (BasicIntVector) bt.getColumn(one);
-                                column = new LongColumn(intVec.getInt(i));
+                                column = intVec.isNull(i) ? new LongColumn((Long) null) : new LongColumn(intVec.getInt(i));
                                 break;
                             case DT_UUID:
                                 BasicUuidVector uuidVector = (BasicUuidVector) bt.getColumn(one);
-                                column = new StringColumn(uuidVector.get(i).getString());
+                                column = uuidVector.isNull(i) ? new StringColumn((String) null) : new StringColumn(uuidVector.get(i).getString());
                                 break;
                             case DT_BLOB:
                             case DT_STRING:
                                 BasicStringVector stringVec = (BasicStringVector) bt.getColumn(one);
-                                column = new StringColumn(stringVec.getString(i));
+                                column = stringVec.isNull(i) ? new StringColumn((String) null) : new StringColumn(stringVec.getString(i));
                                 break;
                             case DT_SYMBOL:
                                 BasicSymbolVector symbolVec = (BasicSymbolVector) bt.getColumn(one);
-                                column = new StringColumn(symbolVec.getString(i));
+                                column = symbolVec.isNull(i) ? new StringColumn((String) null) : new StringColumn(symbolVec.getString(i));
                                 break;
                             case DT_COMPLEX:
                                 BasicComplexVector complexVec = (BasicComplexVector) bt.getColumn(one);
-                                column = new StringColumn(complexVec.getString(i));
+                                column = complexVec.isNull(i) ? new StringColumn((String) null) : new StringColumn(complexVec.getString(i));
                                 break;
                             case DT_DATEHOUR:
                                 BasicDateHourVector dateHourVec = (BasicDateHourVector) bt.getColumn(one);
-                                LocalDateTime dh = dateHourVec.getDateHour(i);
-                                column = new DateColumn(Date.from(dh.atZone( ZoneId.systemDefault()).toInstant()));
+                                if( dateHourVec.isNull(i) ){
+                                    column = new DateColumn((Date) null);
+                                }else{
+                                    column = new DateColumn(Date.from(dateHourVec.getDateHour(i).atZone( ZoneId.systemDefault()).toInstant()));
+                                }
                                 break;
                             case DT_DURATION:
                                 BasicDurationVector durationVec = (BasicDurationVector) bt.getColumn(one);
-                                column = new LongColumn(durationVec.getString(i));
+                                column = durationVec.isNull(i) ? new LongColumn((Long) null) : new LongColumn(durationVec.getString(i));
                                 break;
                             case DT_INT128:
                                 BasicInt128Vector int128Vec = (BasicInt128Vector) bt.getColumn(one);
-                                column = new StringColumn(int128Vec.getString(i));
+                                column = int128Vec.isNull(i) ? new StringColumn((String) null) : new StringColumn(int128Vec.getString(i));
                                 break;
                             case DT_IPADDR:
                                 BasicIPAddrVector ipaddrVec = (BasicIPAddrVector) bt.getColumn(one);
-                                column = new StringColumn(ipaddrVec.getString(i));
+                                column = ipaddrVec.isNull(i) ? new StringColumn((String) null) : new StringColumn(ipaddrVec.getString(i));
                                 break;
                             case DT_MINUTE:
                                 BasicMinuteVector minuteVec = (BasicMinuteVector) bt.getColumn(one);
-                                column = new StringColumn(minuteVec.getString(i));
+                                column = minuteVec.isNull(i) ? new StringColumn((String) null) : new StringColumn(minuteVec.getString(i));
                                 break;
                             case DT_MONTH:
                                 BasicMonthVector monthVec = (BasicMonthVector) bt.getColumn(one);
-                                column = new StringColumn(monthVec.getString(i));
+                                column = monthVec.isNull(i) ? new StringColumn((String) null) : new StringColumn(monthVec.getString(i));
                                 break;
                             case DT_POINT:
                                 BasicPointVector pointVec = (BasicPointVector) bt.getColumn(one);
-                                column = new StringColumn(pointVec.getString(i));
+                                column = pointVec.isNull(i) ? new StringColumn((String) null) : new StringColumn(pointVec.getString(i));
                                 break;
                             case DT_SECOND:
                                 BasicSecondVector secondVec = (BasicSecondVector) bt.getColumn(one);
-                                column = new StringColumn(secondVec.getString(i));
+                                column = secondVec.isNull(i) ? new StringColumn((String) null) : new StringColumn(secondVec.getString(i));
                                 break;
                             default:
                                 LOG.info("Unsupported DataType!!!");
@@ -265,10 +279,10 @@ public class DolphinDBReader extends Reader {
                 else
                     this.functionSql = String.format("select " + sb.toString() + " from loadTable('%s', '%s')", dbName, tbName);
             else
-                if (fieldArr.toString().equals("[]"))
-                    this.functionSql = String.format("select * from loadTable('%s', '%s') where " + where, dbName, tbName);
-                else
-                    this.functionSql = String.format("select " + sb.toString() + " from loadTable('%s', '%s') where " + where, dbName, tbName);
+            if (fieldArr.toString().equals("[]"))
+                this.functionSql = String.format("select * from loadTable('%s', '%s') where " + where, dbName, tbName);
+            else
+                this.functionSql = String.format("select " + sb.toString() + " from loadTable('%s', '%s') where " + where, dbName, tbName);
         }
 
 
