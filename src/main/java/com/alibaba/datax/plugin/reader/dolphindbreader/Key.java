@@ -19,4 +19,6 @@ public class Key {
     public final static String WHERE = "where";
 
     public final static String TABLE = "table";
+
+    public final static String TABLE_SQL = "tableSQL";
 }

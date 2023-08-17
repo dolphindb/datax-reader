@@ -36,6 +36,10 @@ public class DolphinDBReader extends Reader {
         public void init() {
             this.readerConfig = this.getPluginJobConf();
             this.validateParameter();
+            if(readerConfig.getString(Key.DB_PATH) == null || readerConfig.getString(Key.DB_PATH).isEmpty())
+                readerConfig.set(Key.TABLE_SQL,readerConfig.getString(Key.TABLE_NAME));
+            else
+                readerConfig.set(Key.TABLE_SQL,String.format("loadTable(\"%s\",`%s)",readerConfig.getString(Key.DB_PATH),readerConfig.getString(Key.TABLE_NAME)));
             LOG.info("dolphindbreader params:{}", this.readerConfig.toJSON());
         }
 
@@ -224,7 +228,7 @@ public class DolphinDBReader extends Reader {
             this.cols = new ArrayList<>();
             if (fieldArr.toString().equals("[]")){
                 try {
-                    BasicDictionary schema = (BasicDictionary) dbConnection.run("loadTable(\"" + dbName + "\"" + ",`" + tbName + ").schema()");
+                    BasicDictionary schema = (BasicDictionary) dbConnection.run(readerConfig.getString(Key.TABLE_SQL) + ".schema()");
                     BasicTable colDefs = (BasicTable)schema.get(new BasicString("colDefs"));
                     BasicStringVector colNames = (BasicStringVector) colDefs.getColumn("name");
                     for (int i = 0; i < colDefs.rows(); i++){
@@ -275,14 +279,14 @@ public class DolphinDBReader extends Reader {
             }
             if (where.equals(""))
                 if (fieldArr.toString().equals("[]"))
-                    this.functionSql = String.format("select * from loadTable('%s', '%s')", dbName, tbName);
+                    this.functionSql = String.format("select * from %s", readerConfig.getString(Key.TABLE_SQL));
                 else
-                    this.functionSql = String.format("select " + sb.toString() + " from loadTable('%s', '%s')", dbName, tbName);
+                    this.functionSql = String.format("select " + sb + " from %s", readerConfig.getString(Key.TABLE_SQL));
             else
             if (fieldArr.toString().equals("[]"))
-                this.functionSql = String.format("select * from loadTable('%s', '%s') where " + where, dbName, tbName);
+                this.functionSql = String.format("select * from %s where " + where, readerConfig.getString(Key.TABLE_SQL));
             else
-                this.functionSql = String.format("select " + sb.toString() + " from loadTable('%s', '%s') where " + where, dbName, tbName);
+                this.functionSql = String.format("select " + sb + " from %s where " + where, readerConfig.getString(Key.TABLE_SQL));
         }
 
 
