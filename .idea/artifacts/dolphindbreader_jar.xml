@@ -1,0 +1,17 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="dolphindbreader:jar">
+    <output-path>$PROJECT_DIR$/out/artifacts/dolphindbreader_jar</output-path>
+    <root id="archive" name="dolphindbreader.jar">
+      <element id="module-output" name="dolphindbreader" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/libs/junit-4.12.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/libs/api-java-1.30.17.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/libs/slf4j-api-1.7.10.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/libs/hamcrest-core-1.3.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/libs/fastjson-1.1.46.sec01.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/libs/datax-core-0.0.1-SNAPSHOT.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/libs/datax-common-0.0.1-SNAPSHOT.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/libs/datax-transformer-0.0.1-SNAPSHOT.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/libs/plugin-rdbms-util-0.0.1-SNAPSHOT.jar" path-in-jar="/" />
+    </root>
+  </artifact>
+</component>
