@@ -18,6 +18,8 @@ import java.util.*;
 
 public class DolphinDBReader extends Reader {
 
+    private static final String DOLPHINDB_DATAX_READER_VERSION = "1.30.22.1";
+
     public static class Job extends Reader.Job{
         private static final Logger LOG = LoggerFactory.getLogger(Job.class);
 
