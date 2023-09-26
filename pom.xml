@@ -79,8 +79,8 @@
             <groupId>com.dolphindb</groupId>
             <artifactId>api-java</artifactId>
             <scope>system</scope>
-            <version>1.30.17</version>
-            <systemPath>${basedir}/libs/api-java-1.30.17.jar</systemPath>
+            <version>1.30.22.3</version>
+            <systemPath>${basedir}/libs/dolphindb-javaapi-1.30.22.3.jar</systemPath>
         </dependency>
     </dependencies>
 
