@@ -235,7 +235,7 @@ public class DolphinDBReader extends Reader {
             this.cols = new ArrayList<>();
             if (fieldArr.toString().equals("[]")){
                 try {
-                    BasicDictionary schema = (BasicDictionary) dbConnection.run(readerConfig.getString(TABLE_SQL) + ".schema()");
+                    BasicDictionary schema = (BasicDictionary) dbConnection.run(TABLE_SQL + ".schema()");
                     BasicTable colDefs = (BasicTable) schema.get(new BasicString("colDefs"));
                     BasicStringVector colNames = (BasicStringVector) colDefs.getColumn("name");
                     for (int i = 0; i < colDefs.rows(); i++)
