@@ -93,7 +93,10 @@ public class DolphinDBReader extends Reader {
                 for (int i = 0; i < bt.rows(); i++){
                     Column column = null;
                     Record record = recordSender.createRecord();
-                    for (String col : this.cols){
+                    for (String col : this.cols) {
+                        if (Objects.isNull(bt.getColumn(col)))
+                            continue;
+
                         Entity.DATA_TYPE dataType = bt.getColumn(col).getDataType();
                         switch (dataType) {
                             case DT_FLOAT:
@@ -251,6 +254,20 @@ public class DolphinDBReader extends Reader {
             }
         }
 
+        private void initCols() {
+            this.cols = new ArrayList<>();
+            try {
+                BasicDictionary schema = (BasicDictionary) dbConnection.run(TABLE_SQL + ".schema()");
+                BasicTable colDefs = (BasicTable) schema.get(new BasicString("colDefs"));
+                BasicStringVector colNames = (BasicStringVector) colDefs.getColumn("name");
+                for (int i = 0; i < colDefs.rows(); i++)
+                    this.cols.add(colNames.getString(i));
+            }catch (Exception e){
+                LOG.error(e.getMessage(),e);
+            }
+        }
+
+
         @Override
         public void init() {
             this.readerConfig = super.getPluginJobConf();
@@ -278,6 +295,7 @@ public class DolphinDBReader extends Reader {
                 // if set 'querySql', disable 'Where' and  'Table' param.
                 where = null;
                 fieldArr = null;
+                initCols();
             } else {
                 initCols(fieldArr);
                 StringBuilder sb = new StringBuilder();
