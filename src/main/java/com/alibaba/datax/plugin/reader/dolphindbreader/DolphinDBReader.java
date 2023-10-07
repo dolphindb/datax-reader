@@ -9,6 +9,7 @@ import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.xxdb.DBConnection;
 import com.xxdb.data.*;
+import com.xxdb.data.Vector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -180,7 +181,7 @@ public class DolphinDBReader extends Reader {
                                 column = stringVec.isNull(i) ? new StringColumn((String) null) : new StringColumn(stringVec.getString(i));
                                 break;
                             case DT_SYMBOL:
-                                BasicSymbolVector symbolVec = (BasicSymbolVector) bt.getColumn(col);
+                                Vector symbolVec = bt.getColumn(col);
                                 column = symbolVec.isNull(i) ? new StringColumn((String) null) : new StringColumn(symbolVec.getString(i));
                                 break;
                             case DT_COMPLEX:
