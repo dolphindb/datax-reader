@@ -78,9 +78,12 @@ public class DolphinDBReader extends Reader {
                 if (!this.functionSql.equals(""))
                     // if set 'Table' or 'Where' param, use functionSql to run.
                     bt = (BasicTable) dbConnection.run(this.functionSql);
-                else if (!this.querySql.equals(""))
+                else if (!this.querySql.equals("")) {
                     // if set 'querySql' param, disbale 'Table' and 'Where' param if setted, use querySql to run.
                     bt = (BasicTable) dbConnection.run(this.querySql);
+                    initCols(bt);
+                }
+
                 sendData(bt, recordSender);
             }catch (IOException e){
                 LOG.error(e.getMessage(), e);
@@ -254,17 +257,10 @@ public class DolphinDBReader extends Reader {
             }
         }
 
-        private void initCols() {
+        private void initCols(BasicTable bt) {
             this.cols = new ArrayList<>();
-            try {
-                BasicDictionary schema = (BasicDictionary) dbConnection.run(TABLE_SQL + ".schema()");
-                BasicTable colDefs = (BasicTable) schema.get(new BasicString("colDefs"));
-                BasicStringVector colNames = (BasicStringVector) colDefs.getColumn("name");
-                for (int i = 0; i < colDefs.rows(); i++)
-                    this.cols.add(colNames.getString(i));
-            }catch (Exception e){
-                LOG.error(e.getMessage(),e);
-            }
+            for (int i = 0; i < bt.columns(); i ++)
+                this.cols.add(bt.getColumnName(i));
         }
 
 
@@ -295,11 +291,10 @@ public class DolphinDBReader extends Reader {
                 // if set 'querySql', disable 'Where' and  'Table' param.
                 where = null;
                 fieldArr = null;
-                initCols();
             } else {
                 initCols(fieldArr);
                 StringBuilder sb = new StringBuilder();
-                for (int i = 0; i < cols.size(); i++){
+                for (int i = 0; i < cols.size(); i++) {
                     if (i != cols.size()-1)
                         sb.append(cols.get(i)).append(",");
                     else
