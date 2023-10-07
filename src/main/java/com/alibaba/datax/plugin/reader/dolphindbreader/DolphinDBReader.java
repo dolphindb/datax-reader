@@ -223,6 +223,9 @@ public class DolphinDBReader extends Reader {
                                 BasicSecondVector secondVec = (BasicSecondVector) bt.getColumn(col);
                                 column = secondVec.isNull(i) ? new StringColumn((String) null) : new StringColumn(secondVec.getString(i));
                                 break;
+                            case DT_VOID:
+                                column = new StringColumn((String) null);
+                                break;
                             default:
                                 LOG.info("Unsupported DataType!!!");
                                 break;
