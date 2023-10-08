@@ -19,8 +19,8 @@ import java.util.*;
 
 public class DolphinDBReader extends Reader {
 
-    private static final String DOLPHINDB_DATAX_READER_VERSION = "1.30.22.1";
-    private static String TABLE_SQL = "";
+    private static final String DOLPHINDB_DATAX_READER_VERSION = "1.30.22.2";
+    private static String TABLE_HANDLE = "";
 
     public static class Job extends Reader.Job {
         private static final Logger LOG = LoggerFactory.getLogger(Job.class);
@@ -41,9 +41,9 @@ public class DolphinDBReader extends Reader {
             this.readerConfig = this.getPluginJobConf();
             this.validateParameter();
             if(readerConfig.getString(Key.DB_PATH) == null || readerConfig.getString(Key.DB_PATH).isEmpty())
-                TABLE_SQL = readerConfig.getString(Key.TABLE_NAME);
+                TABLE_HANDLE = readerConfig.getString(Key.TABLE_NAME);
             else
-                TABLE_SQL = String.format("loadTable(\"%s\",`%s)", readerConfig.getString(Key.DB_PATH), readerConfig.getString(Key.TABLE_NAME));
+                TABLE_HANDLE = String.format("loadTable(\"%s\",`%s)", readerConfig.getString(Key.DB_PATH), readerConfig.getString(Key.TABLE_NAME));
             LOG.info("dolphindbreader params:{}", this.readerConfig.toJSON());
         }
 
@@ -245,7 +245,7 @@ public class DolphinDBReader extends Reader {
             this.cols = new ArrayList<>();
             if (fieldArr.toString().equals("[]")){
                 try {
-                    BasicDictionary schema = (BasicDictionary) dbConnection.run(TABLE_SQL + ".schema()");
+                    BasicDictionary schema = (BasicDictionary) dbConnection.run(TABLE_HANDLE + ".schema()");
                     BasicTable colDefs = (BasicTable) schema.get(new BasicString("colDefs"));
                     BasicStringVector colNames = (BasicStringVector) colDefs.getColumn("name");
                     for (int i = 0; i < colDefs.rows(); i++)
@@ -307,14 +307,14 @@ public class DolphinDBReader extends Reader {
 
                 if (Objects.nonNull(where) && where.equals("")) {
                     if (fieldArr.toString().equals("[]"))
-                        this.functionSql = String.format("select * from %s", TABLE_SQL);
+                        this.functionSql = String.format("select * from %s", TABLE_HANDLE);
                     else
-                        this.functionSql = String.format("select " + sb + " from %s", TABLE_SQL);
+                        this.functionSql = String.format("select " + sb + " from %s", TABLE_HANDLE);
                 } else {
                     if (fieldArr.toString().equals("[]"))
-                        this.functionSql = String.format("select * from %s where " + where, TABLE_SQL);
+                        this.functionSql = String.format("select * from %s where " + where, TABLE_HANDLE);
                     else
-                        this.functionSql = String.format("select " + sb + " from %s where " + where, TABLE_SQL);
+                        this.functionSql = String.format("select " + sb + " from %s where " + where, TABLE_HANDLE);
                 }
             }
 
