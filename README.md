@@ -155,6 +155,58 @@ BASECODE.json
   - 描述：字段名称。
   - 必选: 是。
   - 默认值: 无。
+- querySql:
+  - 描述：在部分业务场景下，若配置项参数 where 无法描述筛选条件，用户可使用 querySql 以实现 SQL 自定义筛选。 注意，若用户配置了 querySql，则插件 dolphindbreader 将忽略配置项参数 table, where 的筛选条件，即 querySql 的优先级大于table, where。
+  - 必选：否。
+  - 默认值：无。
+  - 使用示例：
+  ```
+  {
+    "job": {
+        "setting": {
+            "speed": {
+                 "channel": 1
+            },
+            "errorLimit": {
+                "record": 0,
+                "percentage": 0.02
+            }
+        },
+        "content": [
+            {
+                "reader": {
+                    "name": "dolphindbreader",
+                    "parameter": {
+                        "userId": "admin",
+                        "pwd": "123456",
+                        "host": "192.168.1.167",
+                        "port": 18921,
+						"dbPath": "dfs://test_allDateType3",
+						"tableName": "pt1",
+                        "querySql": "select col1,col2,col3,col4,col5 ,col15,col16 as ttt from loadTable(\"dfs://test_allDateType3\",`pt1) "
+                    }
+                },
+               "writer": {
+                    "name": "oraclewriter",
+                    "parameter": {
+                        "username": "system",
+                        "password": "DolphinDB123",
+                        "column":["*"],
+                        "connection":[
+                            {
+                            "jdbcUrl":"jdbc:oracle:thin:@192.168.0.9:1521/orcl",
+                            "table":[
+                                "reader_int"
+                                ]
+                            }
+                        ]
+                    }
+                }
+            }
+        ]
+    }
+  }
+  ```
 
 ### 附录二：数据对照表（其他数据类型暂不支持）
 
@@ -187,3 +239,13 @@ BASECODE.json
 | MONTH        | DT_MONTH        | STRING  |
 | POINT        | DT_POINT        | STRING  |
 | SECOND       | DT_SECOND       | STRING  |
+
+## Release Notes
+
+### 新增功能
+
+* 新增支持自定义配置项参数 *querySql*。（**1.30.22.2**）
+
+### 功能优化
+
+* 升级 Java API 至 1.30.22.3 版本。（**1.30.22.2**）

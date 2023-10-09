@@ -20,5 +20,5 @@ public class Key {
 
     public final static String TABLE = "table";
 
-    public final static String TABLE_SQL = "tableSQL";
+    public final static String QUERY_SQL = "querySql";
 }
