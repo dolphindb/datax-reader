@@ -239,3 +239,13 @@ BASECODE.json
 | MONTH        | DT_MONTH        | STRING  |
 | POINT        | DT_POINT        | STRING  |
 | SECOND       | DT_SECOND       | STRING  |
+
+## Release Notes
+
+### 新增功能
+
+* 新增支持自定义配置项参数 *querySql*。（**1.30.22.2**）
+
+### 功能优化
+
+* 升级 Java API 至 1.30.22.3 版本。（**1.30.22.2**）
