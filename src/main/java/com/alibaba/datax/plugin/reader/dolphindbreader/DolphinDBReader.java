@@ -12,51 +12,92 @@ import com.xxdb.data.*;
 import com.xxdb.data.Vector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.time.*;
 import java.util.*;
+import java.util.stream.IntStream;
 
 public class DolphinDBReader extends Reader {
 
-    private static final String DOLPHINDB_DATAX_READER_VERSION = "1.30.22.2";
+    private static final String DOLPHINDB_DATAX_READER_VERSION = "1.30.22.3";
+    private static final String PARTITION = "partition";
     private static String TABLE_HANDLE = "";
 
     public static class Job extends Reader.Job {
         private static final Logger LOG = LoggerFactory.getLogger(Job.class);
-
         private Configuration readerConfig = null;
-
-        @Override
-        public List<Configuration> split(int mandatoryNumber) {
-            List<Configuration> configurations = new ArrayList<Configuration>(mandatoryNumber);
-            for (int i = 0; i < mandatoryNumber; i++)
-                configurations.add(readerConfig);
-
-            return configurations;
-        }
+        private DBConnection connection = null;
+        private Entity dataSources = null;
 
         @Override
         public void init() {
-            this.readerConfig = this.getPluginJobConf();
-            this.validateParameter();
-            if(readerConfig.getString(Key.DB_PATH) == null || readerConfig.getString(Key.DB_PATH).isEmpty())
-                TABLE_HANDLE = readerConfig.getString(Key.TABLE_NAME);
-            else
-                TABLE_HANDLE = String.format("loadTable(\"%s\",`%s)", readerConfig.getString(Key.DB_PATH), readerConfig.getString(Key.TABLE_NAME));
+            try {
+                this.readerConfig = this.getPluginJobConf();
+                Utils.validateParameter(this.readerConfig);
+
+                if(readerConfig.getString(Key.DB_PATH) == null || readerConfig.getString(Key.DB_PATH).isEmpty())
+                    TABLE_HANDLE = readerConfig.getString(Key.TABLE_NAME);
+                else
+                    TABLE_HANDLE = String.format("loadTable(\"%s\",`%s)", readerConfig.getString(Key.DB_PATH), readerConfig.getString(Key.TABLE_NAME));
+
+                this.connection = Utils.connectDB(readerConfig);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+
             LOG.info("dolphindbreader params:{}", this.readerConfig.toJSON());
         }
 
         @Override
-        public void destroy() {
+        public void prepare() {
+            super.prepare();
+            String querySql = this.readerConfig.getString(Key.QUERY_SQL);
 
+            try {
+                if (Objects.nonNull(querySql) && !querySql.equals(""))
+                    this.dataSources = connection.run("ds=sqlDS(<" + querySql + ">); ds;");
+                else
+                    this.dataSources = connection.run(String.format("ds=sqlDS(<select * from %s>); ds;", TABLE_HANDLE));
+
+                if(!this.dataSources.isVector())
+                    throw new RuntimeException("The partition result is not a vector");
+            } catch (IOException e) {
+                LOG.error("Error happened when prepare ds, Information:" + e.getMessage());
+            }
         }
 
-        private void validateParameter() {
-            this.readerConfig.getNecessaryValue(Key.HOST, DolphinDbWriterErrorCode.REQUIRED_VALUE);
-            this.readerConfig.getNecessaryValue(Key.PORT, DolphinDbWriterErrorCode.REQUIRED_VALUE);
-            this.readerConfig.getNecessaryValue(Key.PWD, DolphinDbWriterErrorCode.REQUIRED_VALUE);
-            this.readerConfig.getNecessaryValue(Key.USER_ID, DolphinDbWriterErrorCode.REQUIRED_VALUE);
+        @Override
+        public List<Configuration> split(int mandatoryNumber) {
+            if (mandatoryNumber == 0){
+                LOG.error("Invalid parameter, the number of channel is zero.");
+                return null;
+            }
+
+            List<Configuration> configurationList = new ArrayList<>(mandatoryNumber);
+            Vector dataSourcesVec = (Vector) this.dataSources;
+            int len = dataSourcesVec.rows();
+            Map<Integer, List<String>> partitionConfigMap = new HashMap<>();
+
+            for (int i = 0; i < len; i++) {
+                String dataSourceStr = dataSourcesVec.getString(i);
+                int index = i % mandatoryNumber;
+                partitionConfigMap.computeIfAbsent(index, k -> new ArrayList<>()).add(dataSourceStr);
+            }
+
+            for (int i = 0; i < mandatoryNumber; i++) {
+                // clone readerConfig's copy to set every new config.
+                Configuration tempReaderConfig = readerConfig.clone();
+                tempReaderConfig.set(PARTITION, partitionConfigMap.get(i));
+                configurationList.add(tempReaderConfig);
+            }
+
+            return configurationList;
+        }
+
+        @Override
+        public void destroy() {
+            if (connection != null)
+                connection.close();
         }
     }
 
@@ -65,34 +106,50 @@ public class DolphinDBReader extends Reader {
         private static final Logger LOG = LoggerFactory.getLogger(Job.class);
         private Configuration readerConfig = null;
         private DBConnection dbConnection = null;
-        private String functionSql = "";
+        private List<String> executorySqls = null;
         private List<String> cols = null;
-        private String dbName = "";
-        private String tbName = "";
+        private String dbPath = "";
+        private String tableName = "";
+        private String where = "";
         private String querySql = "";
 
         @Override
-        public void startRead(RecordSender recordSender) {
-            LOG.info("Start to read DolphinDB.");
+        public void init() {
             try {
-                BasicTable bt = null;
-                if (!this.functionSql.equals(""))
-                    // if set 'Table' or 'Where' param, use functionSql to run.
-                    bt = (BasicTable) dbConnection.run(this.functionSql);
-                else if (!this.querySql.equals("")) {
-                    // if set 'querySql' param, disbale 'Table' and 'Where' param if setted, use querySql to run.
-                    bt = (BasicTable) dbConnection.run(this.querySql);
-                    initCols(bt);
-                }
+                this.readerConfig = super.getPluginJobConf();
+                dbConnection = Utils.connectDB(readerConfig);
 
-                sendData(bt, recordSender);
-            }catch (IOException e){
+                this.dbPath = this.readerConfig.getString(Key.DB_PATH);
+                this.tableName = this.readerConfig.getString(Key.TABLE_NAME);
+                this.where = this.readerConfig.getString(Key.WHERE);
+                List<Object> tableField = this.readerConfig.getList(Key.TABLE);
+                JSONArray fieldArr = JSONArray.parseArray(JSON.toJSONString(tableField));
+                this.querySql = this.readerConfig.getString(Key.QUERY_SQL);
+
+                // generate executorySqls.
+                this.executorySqls = generateSQL(fieldArr);
+            } catch (Exception e) {
                 LOG.error(e.getMessage(), e);
             }
         }
 
+        @Override
+        public void startRead(RecordSender recordSender) {
+            LOG.info("Start to read from DolphinDB.");
+            try {
+                for (String executorySql : executorySqls) {
+                    BasicTable bt = (BasicTable) dbConnection.run(executorySql);
+                    if (Objects.nonNull(querySql) && !querySql.isEmpty())
+                        initCols(bt);
 
-        public void sendData(BasicTable bt, RecordSender recordSender){
+                    sendData(bt, recordSender, executorySql);
+                }
+            } catch (IOException e) {
+                LOG.error(e.getMessage(), e);
+            }
+        }
+
+        public void sendData(BasicTable bt, RecordSender recordSender, String executorySql){
             try {
                 for (int i = 0; i < bt.rows(); i++){
                     Column column = null;
@@ -224,6 +281,18 @@ public class DolphinDBReader extends Reader {
                                 BasicSecondVector secondVec = (BasicSecondVector) bt.getColumn(col);
                                 column = secondVec.isNull(i) ? new StringColumn((String) null) : new StringColumn(secondVec.getString(i));
                                 break;
+                            case DT_DECIMAL32:
+                                BasicDecimal32Vector decimal32Vector = (BasicDecimal32Vector) bt.getColumn(col);
+                                column = decimal32Vector.isNull(i) ? new StringColumn(null) : new StringColumn(decimal32Vector.getString(i));
+                                break;
+                            case DT_DECIMAL64:
+                                BasicDecimal64Vector decimal64Vector = (BasicDecimal64Vector) bt.getColumn(col);
+                                column = decimal64Vector.isNull(i) ? new StringColumn(null) : new StringColumn(decimal64Vector.getString(i));
+                                break;
+                            case DT_DECIMAL128:
+                                BasicDecimal128Vector decimal128Vector = (BasicDecimal128Vector) bt.getColumn(col);
+                                column = decimal128Vector.isNull(i) ? new StringColumn(null) : new StringColumn(decimal128Vector.getString(i));
+                                break;
                             case DT_VOID:
                                 column = new StringColumn((String) null);
                                 break;
@@ -235,26 +304,27 @@ public class DolphinDBReader extends Reader {
                     }
                     recordSender.sendToWriter(record);
                 }
-            }catch (Exception ex){
+            } catch (Exception ex) {
                 LOG.error(ex.getMessage(), ex);
             }
-            LOG.info("Value Send Success!!!!!!!");
+
+            LOG.info("Value Send Success!!!!!!! " + executorySql);
         }
 
-        private void initCols(JSONArray fieldArr){
+        private void initCols(JSONArray fieldArr) {
             this.cols = new ArrayList<>();
-            if (fieldArr.toString().equals("[]")){
+            if (fieldArr.toString().equals("[]")) {
                 try {
                     BasicDictionary schema = (BasicDictionary) dbConnection.run(TABLE_HANDLE + ".schema()");
                     BasicTable colDefs = (BasicTable) schema.get(new BasicString("colDefs"));
                     BasicStringVector colNames = (BasicStringVector) colDefs.getColumn("name");
-                    for (int i = 0; i < colDefs.rows(); i++)
-                        this.cols.add(colNames.getString(i));
-                }catch (Exception e){
-                    LOG.error(e.getMessage(),e);
+
+                    IntStream.range(0, colDefs.rows()).forEach(i -> this.cols.add(colNames.getString(i)));
+                } catch (Exception e){
+                    LOG.error(e.getMessage(), e);
                 }
-            }else {
-                for (int i = 0; i < fieldArr.size(); i++){
+            } else {
+                for (int i = 0; i < fieldArr.size(); i++) {
                     JSONObject field = fieldArr.getJSONObject(i);
                     this.cols.add(field.getString("name"));
                 }
@@ -267,58 +337,61 @@ public class DolphinDBReader extends Reader {
                 this.cols.add(bt.getColumnName(i));
         }
 
+        private List<String> generateSQL(JSONArray fieldArr) throws Exception {
 
-        @Override
-        public void init() {
-            this.readerConfig = super.getPluginJobConf();
-            String host = this.readerConfig.getString(Key.HOST);
-            int port = this.readerConfig.getInt(Key.PORT);
-            String userid = this.readerConfig.getString(Key.USER_ID);
-            String pwd = this.readerConfig.getString(Key.PWD);
-
-            dbConnection = new DBConnection();
-            try {
-                dbConnection.connect(host, port, userid, pwd);
-            } catch (IOException e) {
-                LOG.error(e.getMessage(), e);
-            }
-
-            String dbName = this.readerConfig.getString(Key.DB_PATH);
-            String tbName = this.readerConfig.getString(Key.TABLE_NAME);
-            this.dbName = dbName;
-            this.tbName = tbName;
-            String where = this.readerConfig.getString(Key.WHERE);
-            List<Object> tableField = this.readerConfig.getList(Key.TABLE);
-            JSONArray fieldArr = JSONArray.parseArray(JSON.toJSONString(tableField));
-            String querySql = this.readerConfig.getString(Key.QUERY_SQL);
-            if (Objects.nonNull(querySql) && !querySql.equals("")) {
+            StringBuilder colsBuilder = new StringBuilder();
+            if (Objects.nonNull(this.querySql) && !this.querySql.isEmpty()) {
                 // if set 'querySql', disable 'Where' and  'Table' param.
-                where = null;
+                this.where = null;
                 fieldArr = null;
             } else {
                 initCols(fieldArr);
-                StringBuilder sb = new StringBuilder();
-                for (int i = 0; i < cols.size(); i++) {
-                    if (i != cols.size()-1)
-                        sb.append(cols.get(i)).append(",");
+                // if not set 'querySql', build table col's sql part.
+                for (int i = 0; i < this.cols.size(); i++){
+                    if (i != this.cols.size() - 1)
+                        colsBuilder.append(this.cols.get(i)).append(",");
                     else
-                        sb.append(cols.get(i));
-                }
-
-                if (Objects.nonNull(where) && where.equals("")) {
-                    if (fieldArr.toString().equals("[]"))
-                        this.functionSql = String.format("select * from %s", TABLE_HANDLE);
-                    else
-                        this.functionSql = String.format("select " + sb + " from %s", TABLE_HANDLE);
-                } else {
-                    if (fieldArr.toString().equals("[]"))
-                        this.functionSql = String.format("select * from %s where " + where, TABLE_HANDLE);
-                    else
-                        this.functionSql = String.format("select " + sb + " from %s where " + where, TABLE_HANDLE);
+                        colsBuilder.append(this.cols.get(i));
                 }
             }
 
-            this.querySql = querySql;
+            if (Objects.nonNull(this.querySql) && !this.querySql.isEmpty())
+                dbConnection.run("ds=sqlDS(<" + this.querySql + ">); ds;");
+            else
+                dbConnection.run(String.format("ds=sqlDS(<select * from %s>); ds;", TABLE_HANDLE));
+
+            List<Object> dsSqls = this.readerConfig.getList(PARTITION);
+            List<String> functionSqlsList = new ArrayList<>();
+            for (Object dsSqlObj : dsSqls) {
+                String dsSql = (String) dsSqlObj;
+                String script = String.format("temp=size(ds)-1; exec index from table(0..temp as index,ds.string() as str) where str = \"%s\"", dsSql);
+                Entity datasourceIndex = dbConnection.run(script);
+                if (!datasourceIndex.isVector()) {
+                    LOG.error("The datasource list is not a vector.");
+                } else {
+                    Vector datasourceIndexVec = (Vector) datasourceIndex;
+                    for (int i = 0; i < datasourceIndexVec.rows() ;i++){
+                        // 注：到这一步，就不需要考虑 querySql 了，意思是不需要要把 querySql 拼到 sql 中了
+                        if (Objects.nonNull(this.querySql) && !this.querySql.isEmpty()) {
+                            functionSqlsList.add(String.format("select * from ds[%s]", datasourceIndexVec.getString(i)));
+                        } else {
+                            if (this.where == null || this.where.isEmpty()) {
+                                if (fieldArr.toString().equals("[]"))
+                                    functionSqlsList.add(String.format("select * from ds[%s]", datasourceIndexVec.getString(i)));
+                                else
+                                    functionSqlsList.add(String.format("select %s from ds[%s]", colsBuilder, datasourceIndexVec.getString(i)));
+                            } else {
+                                if (fieldArr.toString().equals("[]"))
+                                    functionSqlsList.add(String.format("select * from ds[%s] where " + this.where, datasourceIndexVec.getString(i))) ;
+                                else
+                                    functionSqlsList.add(String.format("select %s from ds[%s] where " + this.where, colsBuilder, datasourceIndexVec.getString(i))) ;
+                            }
+                        }
+                    }
+                }
+            }
+
+            return functionSqlsList;
         }
 
         @Override
@@ -327,7 +400,5 @@ public class DolphinDBReader extends Reader {
                 dbConnection.close();
             }
         }
-
-
     }
 }
