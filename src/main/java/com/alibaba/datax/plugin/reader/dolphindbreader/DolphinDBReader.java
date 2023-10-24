@@ -45,7 +45,7 @@ public class DolphinDBReader extends Reader {
                 throw new RuntimeException(e);
             }
 
-            LOG.info("dolphindbreader params:{}", this.readerConfig.toJSON());
+            LOG.info("DolphinDBReader readerConfig: {}", this.readerConfig.toJSON());
         }
 
         @Override
@@ -53,42 +53,58 @@ public class DolphinDBReader extends Reader {
             super.prepare();
             String querySql = this.readerConfig.getString(Key.QUERY_SQL);
 
-            try {
-                if (Objects.nonNull(querySql) && !querySql.equals(""))
+            if (Objects.nonNull(querySql) && !querySql.equals("")) {
+                try {
                     this.dataSources = connection.run("ds=sqlDS(<" + querySql + ">); ds;");
-                else
+                } catch (IOException e) {
+                    if (e.getMessage().contains("This SQL query can't split into multiple data sources")) {
+                        // disable put 'querySql' to sqlDS split
+                        LOG.info("This querySql can't split into multiple data sources to execute.");
+                        return;
+                    } else {
+                        LOG.error("Error happened when prepare ds, Information:" + e.getMessage());
+                    }
+                }
+            } else {
+                try {
                     this.dataSources = connection.run(String.format("ds=sqlDS(<select * from %s>); ds;", TABLE_HANDLE));
-
-                if(!this.dataSources.isVector())
-                    throw new RuntimeException("The partition result is not a vector");
-            } catch (IOException e) {
-                LOG.error("Error happened when prepare ds, Information:" + e.getMessage());
+                } catch (IOException e) {
+                    LOG.error("Error happened when prepare ds, Information:" + e.getMessage());
+                }
             }
+
+
+            if(!this.dataSources.isVector())
+                throw new RuntimeException("The partition result is not a vector");
         }
 
         @Override
-        public List<Configuration> split(int mandatoryNumber) {
-            if (mandatoryNumber == 0){
+        public List<Configuration> split(int adviceNumber) {
+            if (adviceNumber == 0){
                 LOG.error("Invalid parameter, the number of channel is zero.");
                 return null;
             }
 
-            List<Configuration> configurationList = new ArrayList<>(mandatoryNumber);
-            Vector dataSourcesVec = (Vector) this.dataSources;
-            int len = dataSourcesVec.rows();
-            Map<Integer, List<String>> partitionConfigMap = new HashMap<>();
+            List<Configuration> configurationList = new ArrayList<>(adviceNumber);
+            if (Objects.nonNull(this.dataSources)) {
+                Vector dataSourcesVec = (Vector) this.dataSources;
+                int len = dataSourcesVec.rows();
+                Map<Integer, List<String>> partitionConfigMap = new HashMap<>();
 
-            for (int i = 0; i < len; i++) {
-                String dataSourceStr = dataSourcesVec.getString(i);
-                int index = i % mandatoryNumber;
-                partitionConfigMap.computeIfAbsent(index, k -> new ArrayList<>()).add(dataSourceStr);
-            }
+                for (int i = 0; i < len; i++) {
+                    String dataSourceStr = dataSourcesVec.getString(i);
+                    int index = i % adviceNumber;
+                    partitionConfigMap.computeIfAbsent(index, k -> new ArrayList<>()).add(dataSourceStr);
+                }
 
-            for (int i = 0; i < mandatoryNumber; i++) {
-                // clone readerConfig's copy to set every new config.
-                Configuration tempReaderConfig = readerConfig.clone();
-                tempReaderConfig.set(PARTITION, partitionConfigMap.get(i));
-                configurationList.add(tempReaderConfig);
+                for (int i = 0; i < adviceNumber; i++) {
+                    // clone readerConfig's copy to set every new config.
+                    Configuration tempReaderConfig = this.readerConfig.clone();
+                    tempReaderConfig.set(PARTITION, partitionConfigMap.get(i));
+                    configurationList.add(tempReaderConfig);
+                }
+            } else {
+                    configurationList.add(readerConfig);
             }
 
             return configurationList;
@@ -136,13 +152,20 @@ public class DolphinDBReader extends Reader {
         @Override
         public void startRead(RecordSender recordSender) {
             LOG.info("Start to read from DolphinDB.");
+            BasicTable bt = null;
             try {
-                for (String executorySql : executorySqls) {
-                    BasicTable bt = (BasicTable) dbConnection.run(executorySql);
-                    if (Objects.nonNull(querySql) && !querySql.isEmpty())
-                        initCols(bt);
+                if (Objects.nonNull(this.executorySqls)) {
+                    for (String executorySql : executorySqls) {
+                        bt = (BasicTable) dbConnection.run(executorySql);
+                        if (Objects.nonNull(querySql) && !querySql.isEmpty() && Objects.isNull(this.cols))
+                            initCols(bt);
 
-                    sendData(bt, recordSender, executorySql);
+                        sendData(bt, recordSender, executorySql);
+                    }
+                } else if (Objects.nonNull(querySql) && !querySql.isEmpty()) {
+                        bt = (BasicTable) dbConnection.run(this.querySql);
+                        initCols(bt);
+                        sendData(bt, recordSender, querySql);
                 }
             } catch (IOException e) {
                 LOG.error(e.getMessage(), e);
@@ -308,7 +331,7 @@ public class DolphinDBReader extends Reader {
                 LOG.error(ex.getMessage(), ex);
             }
 
-            LOG.info("Value Send Success!!!!!!! " + executorySql);
+            LOG.info("Value Send Success. " + executorySql);
         }
 
         private void initCols(JSONArray fieldArr) {
@@ -337,13 +360,24 @@ public class DolphinDBReader extends Reader {
                 this.cols.add(bt.getColumnName(i));
         }
 
-        private List<String> generateSQL(JSONArray fieldArr) throws Exception {
-
+        private List<String> generateSQL(JSONArray fieldArr) {
             StringBuilder colsBuilder = new StringBuilder();
             if (Objects.nonNull(this.querySql) && !this.querySql.isEmpty()) {
                 // if set 'querySql', disable 'Where' and  'Table' param.
                 this.where = null;
                 fieldArr = null;
+
+                try {
+                    dbConnection.run("ds=sqlDS(<" + this.querySql + ">); ds;");
+                } catch (IOException e) {
+                    if (e.getMessage().contains("This SQL query can't split into multiple data sources")) {
+                        // disable put 'querySql' to sqlDS split, only execute querySql
+                        LOG.info("This querySql can't split into multiple data sources to execute.");
+                        return null;
+                    } else {
+                        LOG.error("Error happened when prepare ds, Information:" + e.getMessage());
+                    }
+                }
             } else {
                 initCols(fieldArr);
                 // if not set 'querySql', build table col's sql part.
@@ -353,45 +387,51 @@ public class DolphinDBReader extends Reader {
                     else
                         colsBuilder.append(this.cols.get(i));
                 }
-            }
 
-            if (Objects.nonNull(this.querySql) && !this.querySql.isEmpty())
-                dbConnection.run("ds=sqlDS(<" + this.querySql + ">); ds;");
-            else
-                dbConnection.run(String.format("ds=sqlDS(<select * from %s>); ds;", TABLE_HANDLE));
-
-            List<Object> dsSqls = this.readerConfig.getList(PARTITION);
-            List<String> functionSqlsList = new ArrayList<>();
-            for (Object dsSqlObj : dsSqls) {
-                String dsSql = (String) dsSqlObj;
-                String script = String.format("temp=size(ds)-1; exec index from table(0..temp as index,ds.string() as str) where str = \"%s\"", dsSql);
-                Entity datasourceIndex = dbConnection.run(script);
-                if (!datasourceIndex.isVector()) {
-                    LOG.error("The datasource list is not a vector.");
-                } else {
-                    Vector datasourceIndexVec = (Vector) datasourceIndex;
-                    for (int i = 0; i < datasourceIndexVec.rows() ;i++){
-                        // 注：到这一步，就不需要考虑 querySql 了，意思是不需要要把 querySql 拼到 sql 中了
-                        if (Objects.nonNull(this.querySql) && !this.querySql.isEmpty()) {
-                            functionSqlsList.add(String.format("select * from ds[%s]", datasourceIndexVec.getString(i)));
-                        } else {
-                            if (this.where == null || this.where.isEmpty()) {
-                                if (fieldArr.toString().equals("[]"))
-                                    functionSqlsList.add(String.format("select * from ds[%s]", datasourceIndexVec.getString(i)));
-                                else
-                                    functionSqlsList.add(String.format("select %s from ds[%s]", colsBuilder, datasourceIndexVec.getString(i)));
-                            } else {
-                                if (fieldArr.toString().equals("[]"))
-                                    functionSqlsList.add(String.format("select * from ds[%s] where " + this.where, datasourceIndexVec.getString(i))) ;
-                                else
-                                    functionSqlsList.add(String.format("select %s from ds[%s] where " + this.where, colsBuilder, datasourceIndexVec.getString(i))) ;
-                            }
-                        }
-                    }
+                try {
+                    dbConnection.run(String.format("ds=sqlDS(<select * from %s>); ds;", TABLE_HANDLE));
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
                 }
             }
 
-            return functionSqlsList;
+            // try to build ds executorySqls.
+            List<Object> dsSqls = this.readerConfig.getList(PARTITION);
+            List<String> executorySqlsList = new ArrayList<>();
+            for (Object dsSqlObj : dsSqls) {
+                String dsSql = (String) dsSqlObj;
+                String script = String.format("temp=size(ds)-1; exec index from table(0..temp as index,ds.string() as str) where str = \"%s\"", dsSql);
+                try {
+                    Entity datasourceIndex = dbConnection.run(script);
+                    if (!datasourceIndex.isVector()) {
+                        LOG.error("The datasource list is not a vector.");
+                    } else {
+                        Vector datasourceIndexVec = (Vector) datasourceIndex;
+                        for (int i = 0; i < datasourceIndexVec.rows() ;i++){
+                            // 注：到这一步，就不需要考虑 querySql 了，意思是不需要要把 querySql 拼到 sql 中了
+                            if (Objects.nonNull(this.querySql) && !this.querySql.isEmpty()) {
+                                executorySqlsList.add(String.format("select * from ds[%s]", datasourceIndexVec.getString(i)));
+                            } else {
+                                if (this.where == null || this.where.isEmpty()) {
+                                    if (fieldArr.toString().equals("[]"))
+                                        executorySqlsList.add(String.format("select * from ds[%s]", datasourceIndexVec.getString(i)));
+                                    else
+                                        executorySqlsList.add(String.format("select %s from ds[%s]", colsBuilder, datasourceIndexVec.getString(i)));
+                                } else {
+                                    if (fieldArr.toString().equals("[]"))
+                                        executorySqlsList.add(String.format("select * from ds[%s] where " + this.where, datasourceIndexVec.getString(i))) ;
+                                    else
+                                        executorySqlsList.add(String.format("select %s from ds[%s] where " + this.where, colsBuilder, datasourceIndexVec.getString(i))) ;
+                                }
+                            }
+                        }
+                    }
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+
+            return executorySqlsList;
         }
 
         @Override
