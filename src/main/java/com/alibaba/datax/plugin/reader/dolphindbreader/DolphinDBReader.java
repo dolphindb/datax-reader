@@ -85,7 +85,7 @@ public class DolphinDBReader extends Reader {
                 return null;
             }
 
-            List<Configuration> configurationList = new ArrayList<>(adviceNumber);
+            List<Configuration> configurationList = new ArrayList<>();
             if (Objects.nonNull(this.dataSources)) {
                 Vector dataSourcesVec = (Vector) this.dataSources;
                 int len = dataSourcesVec.rows();
@@ -97,7 +97,7 @@ public class DolphinDBReader extends Reader {
                     partitionConfigMap.computeIfAbsent(index, k -> new ArrayList<>()).add(dataSourceStr);
                 }
 
-                for (int i = 0; i < adviceNumber; i++) {
+                for (int i = 0; i < len; i++) {
                     // clone readerConfig's copy to set every new config.
                     Configuration tempReaderConfig = this.readerConfig.clone();
                     tempReaderConfig.set(PARTITION, partitionConfigMap.get(i));
