@@ -57,19 +57,20 @@ public class DolphinDBReader extends Reader {
                 try {
                     this.dataSources = connection.run("ds=sqlDS(<" + querySql + ">); ds;");
                 } catch (IOException e) {
+                    // disable take 'querySql' to sqlDS split logic.
                     if (e.getMessage().contains("This SQL query can't split into multiple data sources")) {
-                        // disable put 'querySql' to sqlDS split
-                        LOG.info("This querySql can't split into multiple data sources to execute.");
+                        LOG.info("Error happened when prepare dataSources, Information: This querySql can't split into multiple data sources to execute. Next will try to run querySql in one task.");
                         return;
                     } else {
-                        LOG.error("Error happened when prepare ds, Information:" + e.getMessage());
+                        LOG.error("Error happened when prepare dataSources, Information: " + e.getMessage() + ". Next will try to run querySql in one task.");
+                        return;
                     }
                 }
             } else {
                 try {
                     this.dataSources = connection.run(String.format("ds=sqlDS(<select * from %s>); ds;", TABLE_HANDLE));
                 } catch (IOException e) {
-                    LOG.error("Error happened when prepare ds, Information:" + e.getMessage());
+                    LOG.error("Error happened when prepare dataSources, Information:" + e.getMessage());
                 }
             }
 
@@ -97,11 +98,20 @@ public class DolphinDBReader extends Reader {
                     partitionConfigMap.computeIfAbsent(index, k -> new ArrayList<>()).add(dataSourceStr);
                 }
 
-                for (int i = 0; i < len; i++) {
-                    // clone readerConfig's copy to set every new config.
-                    Configuration tempReaderConfig = this.readerConfig.clone();
-                    tempReaderConfig.set(PARTITION, partitionConfigMap.get(i));
-                    configurationList.add(tempReaderConfig);
+                if (adviceNumber <= len) {
+                    for (int i = 0; i < adviceNumber; i++) {
+                        // clone readerConfig's copy to set every new config.
+                        Configuration tempReaderConfig = this.readerConfig.clone();
+                        tempReaderConfig.set(PARTITION, partitionConfigMap.get(i));
+                        configurationList.add(tempReaderConfig);
+                    }
+                } else {
+                    for (int i = 0; i < len; i++) {
+                        // clone readerConfig's copy to set every new config.
+                        Configuration tempReaderConfig = this.readerConfig.clone();
+                        tempReaderConfig.set(PARTITION, partitionConfigMap.get(i));
+                        configurationList.add(tempReaderConfig);
+                    }
                 }
             } else {
                     configurationList.add(readerConfig);
@@ -153,8 +163,8 @@ public class DolphinDBReader extends Reader {
         public void startRead(RecordSender recordSender) {
             LOG.info("Start to read from DolphinDB.");
             BasicTable bt = null;
-            try {
-                if (Objects.nonNull(this.executorySqls)) {
+            if (Objects.nonNull(this.executorySqls)) {
+                try {
                     for (String executorySql : executorySqls) {
                         bt = (BasicTable) dbConnection.run(executorySql);
                         if (Objects.nonNull(querySql) && !querySql.isEmpty() && Objects.isNull(this.cols))
@@ -162,13 +172,17 @@ public class DolphinDBReader extends Reader {
 
                         sendData(bt, recordSender, executorySql);
                     }
-                } else if (Objects.nonNull(querySql) && !querySql.isEmpty()) {
-                        bt = (BasicTable) dbConnection.run(this.querySql);
-                        initCols(bt);
-                        sendData(bt, recordSender, querySql);
+                } catch (IOException e) {
+                    LOG.error(e.getMessage(), e);
                 }
-            } catch (IOException e) {
-                LOG.error(e.getMessage(), e);
+            } else if (Objects.nonNull(querySql) && !querySql.isEmpty()) {
+                try {
+                    bt = (BasicTable) dbConnection.run(this.querySql);
+                    initCols(bt);
+                    sendData(bt, recordSender, querySql);
+                } catch (IOException e) {
+                    LOG.error("Error happened when run querySql, please check your querySql: " + e.getMessage());
+                }
             }
         }
 
@@ -372,10 +386,11 @@ public class DolphinDBReader extends Reader {
                 } catch (IOException e) {
                     if (e.getMessage().contains("This SQL query can't split into multiple data sources")) {
                         // disable put 'querySql' to sqlDS split, only execute querySql
-                        LOG.info("This querySql can't split into multiple data sources to execute.");
+                        LOG.info("Error happened when prepare dataSources, Information: This querySql can't split into multiple data sources to execute. Next will try to run querySql in one task.");
                         return null;
                     } else {
-                        LOG.error("Error happened when prepare ds, Information:" + e.getMessage());
+                        LOG.error("Error happened when prepare dataSources, Information: " + e.getMessage() + ". Next will try to run querySql in one task.");
+                        return null;
                     }
                 }
             } else {
@@ -400,11 +415,13 @@ public class DolphinDBReader extends Reader {
             List<String> executorySqlsList = new ArrayList<>();
             for (Object dsSqlObj : dsSqls) {
                 String dsSql = (String) dsSqlObj;
-                String script = String.format("temp=size(ds)-1; exec index from table(0..temp as index,ds.string() as str) where str = \"%s\"", dsSql);
+                String transferedDsSql = dsSql.replace("\"", "\\\"");
+                String script = String.format("temp=size(ds)-1; exec index from table(0..temp as index,ds.string() as str) where str = \"%s\"", transferedDsSql);
                 try {
                     Entity datasourceIndex = dbConnection.run(script);
                     if (!datasourceIndex.isVector()) {
-                        LOG.error("The datasource list is not a vector.");
+                        LOG.error("The datasource list is not a vector. Next will try to run querySql in current task.");
+                        return null;
                     } else {
                         Vector datasourceIndexVec = (Vector) datasourceIndex;
                         for (int i = 0; i < datasourceIndexVec.rows() ;i++){
