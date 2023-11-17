@@ -6,11 +6,11 @@ DataX 是在阿里巴巴集团内被广泛使用的离线数据同步工具/平�
 
 DataX 是可扩展的数据同步框架，将不同数据源的同步抽象为从源头数据源读取数据的 Reader 插件，以及向目标端写入数据的 Writer 插件。理论上 DataX 框架可以支持任意数据源类型的数据同步工作。每接入一套新数据源该新加入的数据源即可实现和现有的数据源互通。
 
-### DataX 插件：dolphindbreader
+### DataX 插件：DolphinDBReader
 
-基于 DataX 的扩展功能，dolphindbreader 插件实现了从 DolphinDB 读出数据。使用 DataX 官方现有的 writer 插件结合 dolphindbreader 插件，即可满足从 DolphinDB 向不同数据源同步数据。
+基于 DataX 的扩展功能，DolphinDBReader 插件实现了从 DolphinDB 读出数据。使用 DataX 官方现有的 writer 插件结合 DolphinDBReader 插件，即可满足从 DolphinDB 向不同数据源同步数据。
 
-dolphindbreader 底层依赖 DolphinDB Java API，采用批量读出的方式将分布式数据库的数据读出。
+DolphinDBReader 底层依赖 DolphinDB Java API，采用批量读出的方式将分布式数据库的数据读出。
 
 注意：如果一次性读出的 DolphinDB 源表过大，会造成插件 OOM 报错，建议使用读出数据量在 200 万以下的表。
 
@@ -22,7 +22,7 @@ dolphindbreader 底层依赖 DolphinDB Java API，采用批量读出的方式将
 
 [点击下载 DataX](https://datax-opensource.oss-cn-hangzhou.aliyuncs.com/202210/datax.tar.gz)。
 
-### 2.2 部署 DataX-DolphinDBReader 插件
+### 2.2 部署 DolphinDBReader 插件
 
 将源码的 `./dolphindbreader` 目录及下所有内容拷贝到 `datax/plugin/reader` 目录下，即可使用。
 
@@ -43,7 +43,7 @@ python2 datax.py /root/datax/myconf/BASECODE.json
 
 下面以从 DolphinDB 向 Oracle 导入一张表 BASECODE 进行示例。
 
-首先在导入前，需要在 Oracle 中预先创建好目标数据库和表；然后使用 dolphindbreader 从 DolphinDB 读取 BASECODE 源表全量数据；再使用 oraclewriter 将读取到的 BASECODE 数据写入 Oracle 对应的目标表中。
+首先在导入前，需要在 Oracle 中预先创建好目标数据库和表；然后使用 DolphinDBReader 从 DolphinDB 读取 BASECODE 源表全量数据；再使用 oraclewriter 将读取到的 BASECODE 数据写入 Oracle 对应的目标表中。
 
 编写配置文件 BASECODE.json，并存放到指定目录，比如 `/root/datax/myconf `目录下，配置文件说明请参考附录一。
 
@@ -117,7 +117,7 @@ BASECODE.json
 
 #### 配置文件参数说明
 
-（仅介绍 dolphindbreader 的参数，writer 参数根据写入目标数据库的不同而不同，详情参阅：[datax指南](https://github.com/alibaba/DataX/blob/master/userGuid.md) ）
+（仅介绍 DolphinDBReader 的参数，writer 参数根据写入目标数据库的不同而不同，详情参阅：[datax指南](https://github.com/alibaba/DataX/blob/master/userGuid.md) ）
 
 - host
   - 描述：Server Host。
@@ -156,7 +156,7 @@ BASECODE.json
   - 必选: 是。
   - 默认值: 无。
 - querySql:
-  - 描述：在部分业务场景下，若配置项参数 where 无法描述筛选条件，用户可使用 querySql 以实现 SQL 自定义筛选。 注意，若用户配置了 querySql，则插件 dolphindbreader 将忽略配置项参数 table, where 的筛选条件，即 querySql 的优先级大于table, where。
+  - 描述：在部分业务场景下，若配置项参数 where 无法描述筛选条件，用户可使用 querySql 以实现 SQL 自定义筛选。 注意，若用户配置了 querySql，则插件 DolphinDBReader 将忽略配置项参数 table, where 的筛选条件，即 querySql 的优先级大于table, where。
   - 必选：否。
   - 默认值：无。
   - 使用示例：
@@ -239,13 +239,6 @@ BASECODE.json
 | MONTH        | DT_MONTH        | STRING  |
 | POINT        | DT_POINT        | STRING  |
 | SECOND       | DT_SECOND       | STRING  |
-
-## Release Notes
-
-### 新增功能
-
-* 新增支持自定义配置项参数 *querySql*。（**1.30.22.2**）
-
-### 功能优化
-
-* 升级 Java API 至 1.30.22.3 版本。（**1.30.22.2**）
+| DECIMAL32    | DT_DECIMAL32    | STRING  |
+| DECIMAL64    | DT_DECIMAL64    | STRING  |
+| DECIMAL128   | DT_DECIMAL128   | STRING  |
