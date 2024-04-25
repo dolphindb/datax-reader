@@ -1,6 +1,8 @@
 # DolphinDBReader 发行说明
 
-## 1.30.22.3
+> 注意：为提升用户体验，DolphinDBReader 的版本号现已调整。新的版本号与 DolphinDB Server 系列对齐。
+
+## 3.00.0.0
 
 ### 新增功能
 
