@@ -1,5 +1,7 @@
 # 基于 DataX 的 DolphinDB 数据读取工具
 
+> 注意：该 Readme 不再进行维护。用户可移步至 DolphinDB 官方文档中心 [第三方工具说明](https://docs.dolphindb.cn/zh/2.00.13/third_party.html)。 
+
 ## 1. DataX 离线数据同步
 
 DataX 是在阿里巴巴集团内被广泛使用的离线数据同步工具/平台，实现包括 MySQL、Oracle、SqlServer、Postgre、HDFS、Hive、ADS、HBase、TableStore(OTS)、MaxCompute(ODPS)、DRDS 等各种异构数据源之间高效的数据同步功能，详情可查看 [DataX 已支持的数据源](https://github.com/alibaba/DataX/blob/master/README.md#support-data-channels)。
